@@ -122,9 +122,9 @@ class Rollout
   end
 
   def delete(feature)
-    features = (@storage.get(features_key) || "").split(",")
-    features.delete(feature.to_s)
-    @storage.set(features_key, features.join(","))
+    remaining_features = features
+    remaining_features.delete(feature.to_sym)
+    @storage.set(features_key, remaining_features.join(","))
     @storage.del(key(feature))
   end
 
@@ -212,6 +212,11 @@ class Rollout
   def get(feature)
     string = @storage.get(key(feature))
     Feature.new(feature, string, @options)
+  end
+
+  def multi_get(*features)
+    feature_keys = features.map{ |feature| key(feature) }
+    @storage.mget(*feature_keys).map.with_index { |string, index| Feature.new(features[index], string, @options) }
   end
 
   def features

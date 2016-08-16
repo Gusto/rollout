@@ -523,6 +523,28 @@ RSpec.describe "Rollout" do
       expect(@rollout.user_in_active_users?(:chat, "5")).to eq(false)
     end
   end
+
+  describe "#multi_get" do
+    before do
+        @rollout.activate_percentage(:chat, 10)
+        @rollout.activate_group(:chat, :caretakers)
+        @rollout.activate_group(:videos, :greeters)
+        @rollout.activate(:signup)
+        @rollout.activate_user(:photos, double(id: 42))
+      end
+
+    it "returns an array of features" do
+      features = @rollout.multi_get(:chat, :videos, :signup)
+      expect(features[0].name).to eq :chat
+      expect(features[0].groups).to eq [:caretakers].to_set
+      expect(features[0].percentage).to eq 10
+      expect(features[1].name).to eq :videos
+      expect(features[1].groups).to eq [:greeters].to_set
+      expect(features[2].name).to eq :signup
+      expect(features[2].percentage).to eq 100
+      expect(features.size).to eq 3
+    end
+  end
 end
 
 describe "Rollout::Feature" do
