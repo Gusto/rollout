@@ -19,9 +19,7 @@ class Rollout
   end
 
   def deactivate(feature)
-    with_feature(feature) do |f|
-      f.clear
-    end
+    feature_storage.deactivate_feature(feature)
   end
 
   def delete(feature)
@@ -97,15 +95,11 @@ class Rollout
   end
 
   def set_feature_data(feature, data)
-    with_feature(feature) do |f|
-      f.data.merge!(data) if data.is_a? Hash
-    end
+    feature_storage.set_feature_data(feature, data)
   end
 
   def clear_feature_data(feature)
-    with_feature(feature) do |f|
-      f.data = {}
-    end
+    feature_storage.clear_feature_data(feature)
   end
 
   def multi_get(*features)
@@ -135,12 +129,6 @@ class Rollout
   end
 
   private
-
-  def with_feature(feature)
-    f = get(feature)
-    yield(f)
-    feature_storage.save_feature(f)
-  end
 
   def feature_storage
     @feature_storage ||= FeatureStorage.new(@storage)
@@ -193,22 +181,6 @@ class Rollout
       features.map { |feature| [feature, fetch_feature(feature)] }
     end
 
-    def save_feature(feature)
-      @redis.multi do
-        serialized = feature.serialize.split('|', 4)
-        @redis.set(key(feature.name, KEY_PERCENTAGE), feature.percentage)
-
-        # TODO: we clear lists before we set new values, this should be refactored out later
-        @redis.del(key(feature.name, KEY_USERS))
-        @redis.sadd(key(feature.name, KEY_USERS), feature.users.to_a) if feature.users.size > 0
-        @redis.del(key(feature.name, KEY_GROUPS))
-        @redis.sadd(key(feature.name, KEY_GROUPS), feature.groups.to_a) if feature.groups.size > 0
-
-        @redis.set(key(feature.name, KEY_DATA), serialized[3])
-        @redis.sadd(FEATURES_KEY, feature.name)
-      end
-    end
-
     def activate_group(feature, group)
       @redis.multi do
         @redis.sadd(key(feature, KEY_GROUPS), group)
@@ -240,12 +212,37 @@ class Rollout
     def delete_feature(feature)
       @redis.multi do
         @redis.srem(FEATURES_KEY, feature)
-        clear_feature(feature)
+        @redis.del(SUBKEYS.map { |subkey| key(feature, subkey) })
       end
     end
 
-    def clear_feature(feature)
-      @redis.del(SUBKEYS.map { |subkey| key(feature, subkey) })
+    def deactivate_feature(feature)
+      @redis.multi do
+        @redis.del(SUBKEYS.map { |subkey| key(feature, subkey) })
+        @redis.sadd(FEATURES_KEY, feature)
+      end
+    end
+
+    def get_feature_data(feature)
+      raw_data = @redis.get(key(feature, KEY_DATA))
+      raw_data.nil? || raw_data.strip.empty? ? {} : JSON.parse(raw_data)
+    end
+
+    def set_feature_data(feature, data)
+      if data.is_a? Hash
+        old_data = get_feature_data(feature)
+        @redis.multi do
+          @redis.set(key(feature, KEY_DATA), old_data.merge!(data).to_json)
+          @redis.sadd(FEATURES_KEY, feature)
+        end
+      end
+    end
+
+    def clear_feature_data(feature)
+      @redis.multi do
+        @redis.set(key(feature, KEY_DATA), "{}")
+        @redis.sadd(FEATURES_KEY, feature)
+      end
     end
 
     def delete
@@ -253,10 +250,10 @@ class Rollout
     end
 
     def clear!
-      all.each do |feature|
-        delete_feature(feature)
+      redis_keys = [FEATURES_KEY] + all.flat_map do |feature|
+        SUBKEYS.map { |subkey| key(feature, subkey) }
       end
-      delete
+      @redis.del(redis_keys)
     end
 
     def key(name, type)
