@@ -61,8 +61,7 @@ class Rollout
   end
 
   def active?(feature, user = nil)
-    feature = get(feature)
-    feature.active?(self, user)
+    get(feature).active?(self, user)
   end
 
   def user_in_active_users?(feature, user = nil)
@@ -84,16 +83,6 @@ class Rollout
   def active_in_group?(group, user)
     f = @groups[group.to_sym]
     f && f.call(user)
-  end
-
-  def get_uncached(feature)
-    feature_list.add_feature(feature)
-    Feature.new(feature, @redis, @options)
-  end
-
-  # We can cache aggresively because the feature class re-fetches things correctly
-  def feature_cache
-    @feature_cache ||= Hash.new {|h, key| h[key] = get_uncached(key) }
   end
 
   def get(feature)
@@ -138,6 +127,16 @@ class Rollout
   end
 
   private
+
+  def get_uncached(feature)
+    feature_list.add_feature(feature)
+    Feature.new(feature, @redis, @options)
+  end
+
+  # We can cache aggresively because the feature class re-fetches things correctly
+  def feature_cache
+    @feature_cache ||= Hash.new {|h, key| h[key] = get_uncached(key) }
+  end
 
   def feature_list
     @feature_list ||= FeatureList.new(@redis)
