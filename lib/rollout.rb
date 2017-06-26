@@ -27,7 +27,7 @@ class Rollout
   end
 
   def delete(feature)
-    feature_list.remove_feature(feature)
+    feature_list.delete_feature(feature)
     @storage.del(key(feature))
   end
 
@@ -194,7 +194,7 @@ class Rollout
       @storage.sadd(FEATURES_KEY, feature)
     end
 
-    def remove_feature(feature)
+    def delete_feature(feature)
       @storage.srem(FEATURES_KEY, feature)
     end
 
