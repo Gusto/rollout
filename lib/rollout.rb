@@ -27,7 +27,7 @@ class Rollout
   end
 
   def delete(feature)
-    feature_list.delete_feature(feature)
+    feature_storage.delete_feature(feature)
   end
 
   def set(feature, desired_state)
@@ -112,7 +112,7 @@ class Rollout
   end
 
   def get(feature)
-    string = feature_list.fetch_feature(feature)
+    string = feature_storage.fetch_feature(feature)
     Feature.new(feature, string, @options)
   end
 
@@ -129,13 +129,13 @@ class Rollout
   end
 
   def multi_get(*features)
-    feature_list.fetch_multi_features(features).map do |name, string|
+    feature_storage.fetch_multi_features(features).map do |name, string|
       Feature.new(name, string, @options)
     end
   end
 
   def features
-    feature_list.all
+    feature_storage.all
   end
 
   def feature_states(user = nil)
@@ -155,7 +155,7 @@ class Rollout
       delete(feature)
     end
 
-    feature_list.delete
+    feature_storage.delete
   end
 
   private
@@ -171,11 +171,11 @@ class Rollout
   end
 
   def save(feature)
-    feature_list.save_feature(feature.name, feature.serialize)
+    feature_storage.save_feature(feature.name, feature.serialize)
   end
 
-  def feature_list
-    FeatureStorage.new(@storage)
+  def feature_storage
+    @feature_storage ||= FeatureStorage.new(@storage)
   end
 
   class FeatureStorage
