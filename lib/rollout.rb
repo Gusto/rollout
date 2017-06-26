@@ -167,7 +167,12 @@ class Rollout
   end
 
   class FeatureStorage
-    FEATURES_KEY = "feature:__features__".freeze
+    FEATURES_KEY   = "feature:__features__".freeze
+    KEY_PERCENTAGE = "percentage".freeze
+    KEY_USERS      = "users".freeze
+    KEY_GROUPS     = "groups".freeze
+    KEY_DATA       = "data".freeze
+    SUBKEYS        = [KEY_PERCENTAGE, KEY_USERS, KEY_GROUPS, KEY_DATA].freeze
 
     def initialize(redis)
       @redis = redis
@@ -178,7 +183,13 @@ class Rollout
     end
 
     def fetch_feature(feature)
-      @redis.get(legacy_key(feature))
+      percentage, users, groups, data = @redis.multi do
+        @redis.get(key(feature, KEY_PERCENTAGE))
+        @redis.lrange(key(feature, KEY_USERS), 0, -1)
+        @redis.lrange(key(feature, KEY_GROUPS), 0, -1)
+        @redis.get(key(feature, KEY_DATA))
+      end
+      "#{percentage}|#{users.join(',')}|#{groups.join(',')}|#{data}"
     end
 
     def fetch_multi_features(features)
@@ -186,13 +197,28 @@ class Rollout
     end
 
     def save_feature(feature)
-      @redis.set(legacy_key(feature.name), feature.serialize)
-      @redis.sadd(FEATURES_KEY, feature.name)
+      @redis.multi do
+        serialized = feature.serialize.split('|', 4)
+        @redis.set(key(feature.name, KEY_PERCENTAGE), feature.percentage)
+
+        # TODO: we clear lists before we set new values, this should be refactored out later
+        @redis.del(key(feature.name, KEY_USERS))
+        @redis.rpush(key(feature.name, KEY_USERS), feature.users.to_a) if feature.users.size > 0
+        @redis.del(key(feature.name, KEY_GROUPS))
+        @redis.rpush(key(feature.name, KEY_GROUPS), feature.groups.to_a) if feature.groups.size > 0
+
+        @redis.set(key(feature.name, KEY_DATA), serialized[3])
+        @redis.sadd(FEATURES_KEY, feature.name)
+      end
     end
 
     def delete_feature(feature)
-      @redis.srem(FEATURES_KEY, feature)
-      @redis.del(legacy_key(feature))
+      @redis.multi do
+        @redis.srem(FEATURES_KEY, feature)
+        SUBKEYS.each do |subkey|
+          @redis.del(key(feature, subkey))
+        end
+      end
     end
 
     def delete
@@ -206,8 +232,8 @@ class Rollout
       delete
     end
 
-    def legacy_key(name)
-      "feature:#{name}"
+    def key(name, type)
+      "feature:#{name}:#{type}"
     end
   end
 end
