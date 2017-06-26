@@ -5,6 +5,8 @@ require "set"
 require "json"
 
 class Rollout
+  FEATURES_KEY   = "feature:__features__".freeze
+
   def initialize(redis, opts = {})
     @redis = redis
     @options = opts
@@ -21,7 +23,7 @@ class Rollout
 
   def delete(feature)
     get(feature).clear!
-    feature_list.delete_feature(feature)
+    @redis.srem(FEATURES_KEY, feature)
   end
 
   def set(feature, desired_state)
@@ -104,7 +106,7 @@ class Rollout
   end
 
   def features
-    feature_list.all
+    @redis.smembers(FEATURES_KEY).map(&:to_sym)
   end
 
   def feature_states(user = nil)
@@ -123,46 +125,20 @@ class Rollout
     features.each do |feature|
       get(feature).clear!
     end
-    feature_list.clear!
+    @redis.del(FEATURES_KEY)
   end
 
   private
 
   def get_uncached(feature)
-    feature_list.add_feature(feature)
+    # Right now we add the feature to the feature list if anything tries to
+    # fetch it, this is due to rollout working a bit funky in that case.
+    @redis.sadd(FEATURES_KEY, feature)
     Feature.new(feature, @redis, @options)
   end
 
   # We can cache aggresively because the feature class re-fetches things correctly
   def feature_cache
     @feature_cache ||= Hash.new {|h, key| h[key] = get_uncached(key) }
-  end
-
-  def feature_list
-    @feature_list ||= FeatureList.new(@redis)
-  end
-
-  class FeatureList
-    FEATURES_KEY   = "feature:__features__".freeze
-
-    def initialize(redis)
-      @redis = redis
-    end
-
-    def all
-      @redis.smembers(FEATURES_KEY).map(&:to_sym)
-    end
-
-    def add_feature(feature)
-      @redis.sadd(FEATURES_KEY, feature)
-    end
-
-    def delete_feature(feature)
-      @redis.srem(FEATURES_KEY, feature)
-    end
-
-    def clear!
-      @redis.del(FEATURES_KEY)
-    end
   end
 end
