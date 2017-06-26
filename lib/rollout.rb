@@ -5,9 +5,6 @@ require "set"
 require "json"
 
 class Rollout
-  # TODO (v3):  Deprecate this public interface
-  RAND_BASE = ::Feature::RAND_BASE
-
   def initialize(redis, opts = {})
     @redis = redis
     @options = opts
