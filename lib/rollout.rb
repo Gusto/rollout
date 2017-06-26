@@ -8,8 +8,8 @@ class Rollout
   # TODO (v3):  Deprecate this public interface
   RAND_BASE = ::Feature::RAND_BASE
 
-  def initialize(storage, opts = {})
-    @storage = storage
+  def initialize(redis, opts = {})
+    @redis = redis
     @options = opts
     @groups  = { all: lambda { |user| true } }
   end
@@ -131,7 +131,7 @@ class Rollout
   private
 
   def feature_storage
-    @feature_storage ||= FeatureStorage.new(@storage)
+    @feature_storage ||= FeatureStorage.new(@redis)
   end
 
   def user_id_for_user(user)
