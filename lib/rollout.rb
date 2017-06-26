@@ -113,7 +113,7 @@ class Rollout
   end
 
   def get(feature)
-    string = @storage.get(key(feature))
+    string = feature_list.fetch_feature(feature)
     Feature.new(feature, string, @options)
   end
 
@@ -130,8 +130,9 @@ class Rollout
   end
 
   def multi_get(*features)
-    feature_keys = features.map{ |feature| key(feature) }
-    @storage.mget(*feature_keys).map.with_index { |string, index| Feature.new(features[index], string, @options) }
+    feature_list.fetch_multi_features(features).map do |name, string|
+      Feature.new(name, string, @options)
+    end
   end
 
   def features
@@ -190,6 +191,15 @@ class Rollout
       @storage.smembers(FEATURES_KEY).map(&:to_sym)
     end
 
+    def fetch_feature(feature)
+      @storage.get(legacy_key(feature))
+    end
+
+    def fetch_multi_features(features)
+      feature_keys = features.map{ |feature| legacy_key(feature) }
+      @storage.mget(*feature_keys).map.with_index { |string, index| [features[index], string] }
+    end
+
     def add_feature(feature)
       @storage.sadd(FEATURES_KEY, feature)
     end
@@ -200,6 +210,10 @@ class Rollout
 
     def delete
       @storage.del(FEATURES_KEY)
+    end
+
+    def legacy_key(name)
+      "feature:#{name}"
     end
   end
 end
