@@ -16,10 +16,11 @@ class Rollout
   end
 
   def deactivate(feature)
-    feature_storage.deactivate_feature(feature)
+    get(feature).clear!
   end
 
   def delete(feature)
+    get(feature).clear!
     feature_storage.delete_feature(feature)
   end
 
@@ -32,11 +33,11 @@ class Rollout
   end
 
   def activate_group(feature, group)
-    feature_storage.activate_group(feature, group)
+    get(feature).add_group(group)
   end
 
   def deactivate_group(feature, group)
-    feature_storage.deactivate_group(feature, group)
+    get(feature).remove_group(group)
   end
 
   def activate_user(feature, user)
@@ -48,11 +49,11 @@ class Rollout
   end
 
   def activate_users(feature, users)
-    feature_storage.activate_users(feature, users.map { |u| user_id_for_user(u) })
+    get(feature).add_users(users)
   end
 
   def deactivate_users(feature, users)
-    feature_storage.deactivate_users(feature, users.map { |u| user_id_for_user(u) })
+    get(feature).remove_users(users)
   end
 
   def define_group(group, &block)
@@ -65,7 +66,7 @@ class Rollout
   end
 
   def user_in_active_users?(feature, user = nil)
-    feature_storage.user_in_user_list?(feature, user_id_for_user(user))
+    get(feature).user_in_active_users?(user)
   end
 
   def inactive?(feature, user = nil)
@@ -73,7 +74,7 @@ class Rollout
   end
 
   def activate_percentage(feature, percentage)
-    feature_storage.set_percentage(feature, percentage)
+    get(feature).percentage = percentage
   end
 
   def deactivate_percentage(feature)
@@ -85,22 +86,31 @@ class Rollout
     f && f.call(user)
   end
 
+  def get_uncached(feature)
+    feature_storage.add_feature(feature)
+    Feature.new(feature, @redis, @options)
+  end
+
+  # We can cache aggresively because the feature class re-fetches things correctly
+  def feature_cache
+    @feature_cache ||= Hash.new {|h, key| h[key] = get_uncached(key) }
+  end
+
   def get(feature)
-    string = feature_storage.fetch_feature(feature)
-    Feature.new(feature, string, @options)
+    feature_cache[feature]
   end
 
   def set_feature_data(feature, data)
-    feature_storage.set_feature_data(feature, data)
+    get(feature).data = data
   end
 
   def clear_feature_data(feature)
-    feature_storage.clear_feature_data(feature)
+    get(feature).clear_data!
   end
 
   def multi_get(*features)
-    feature_storage.fetch_multi_features(features).map do |name, string|
-      Feature.new(name, string, @options)
+    features.map do |feature|
+      get(feature)
     end
   end
 
@@ -121,6 +131,9 @@ class Rollout
   end
 
   def clear!
+    features.each do |feature|
+      get(feature).clear!
+    end
     feature_storage.clear!
   end
 
@@ -130,25 +143,8 @@ class Rollout
     @feature_storage ||= FeatureStorage.new(@redis)
   end
 
-  def user_id_for_user(user)
-    if user.is_a?(Integer) || user.is_a?(String)
-      user.to_s
-    else
-      user.send(id_user_by).to_s
-    end
-  end
-
-  def id_user_by
-    @options[:id_user_by] || :id
-  end
-
   class FeatureStorage
     FEATURES_KEY   = "feature:__features__".freeze
-    KEY_PERCENTAGE = "percentage".freeze
-    KEY_USERS      = "users".freeze
-    KEY_GROUPS     = "groups".freeze
-    KEY_DATA       = "data".freeze
-    SUBKEYS        = [KEY_PERCENTAGE, KEY_USERS, KEY_GROUPS, KEY_DATA].freeze
 
     def initialize(redis)
       @redis = redis
@@ -158,102 +154,16 @@ class Rollout
       @redis.smembers(FEATURES_KEY).map(&:to_sym)
     end
 
-    def set_percentage(feature, percentage)
-      @redis.set(key(feature, KEY_PERCENTAGE), percentage)
+    def add_feature(feature)
       @redis.sadd(FEATURES_KEY, feature)
     end
 
-    def fetch_feature(feature)
-      percentage, users, groups, data = @redis.multi do
-        @redis.get(key(feature, KEY_PERCENTAGE))
-        @redis.smembers(key(feature, KEY_USERS))
-        @redis.smembers(key(feature, KEY_GROUPS))
-        @redis.get(key(feature, KEY_DATA))
-      end
-      "#{percentage}|#{users.join(',')}|#{groups.join(',')}|#{data}"
-    end
-
-    def fetch_multi_features(features)
-      features.map { |feature| [feature, fetch_feature(feature)] }
-    end
-
-    def activate_group(feature, group)
-      @redis.multi do
-        @redis.sadd(key(feature, KEY_GROUPS), group)
-        @redis.sadd(FEATURES_KEY, feature)
-      end
-    end
-
-    def deactivate_group(feature, group)
-      @redis.multi do
-        @redis.srem(key(feature, KEY_GROUPS), group)
-        @redis.sadd(FEATURES_KEY, feature)
-      end
-    end
-
-    def activate_users(feature, users)
-      @redis.multi do
-        @redis.sadd(key(feature, KEY_USERS), users)
-        @redis.sadd(FEATURES_KEY, feature)
-      end
-    end
-
-    def user_in_user_list?(feature, user)
-      @redis.sismember(key(feature, KEY_USERS), user)
-    end
-
-    def deactivate_users(feature, users)
-      @redis.multi do
-        @redis.srem(key(feature, KEY_USERS), users)
-        @redis.sadd(FEATURES_KEY, feature)
-      end
-    end
-
     def delete_feature(feature)
-      @redis.multi do
-        @redis.srem(FEATURES_KEY, feature)
-        @redis.del(SUBKEYS.map { |subkey| key(feature, subkey) })
-      end
-    end
-
-    def deactivate_feature(feature)
-      @redis.multi do
-        @redis.del(SUBKEYS.map { |subkey| key(feature, subkey) })
-        @redis.sadd(FEATURES_KEY, feature)
-      end
-    end
-
-    def get_feature_data(feature)
-      raw_data = @redis.get(key(feature, KEY_DATA))
-      raw_data.nil? || raw_data.strip.empty? ? {} : JSON.parse(raw_data)
-    end
-
-    def set_feature_data(feature, data)
-      if data.is_a? Hash
-        old_data = get_feature_data(feature)
-        @redis.multi do
-          @redis.set(key(feature, KEY_DATA), old_data.merge!(data).to_json)
-          @redis.sadd(FEATURES_KEY, feature)
-        end
-      end
-    end
-
-    def clear_feature_data(feature)
-      @redis.multi do
-        @redis.set(key(feature, KEY_DATA), "{}")
-        @redis.sadd(FEATURES_KEY, feature)
-      end
-    end
-
-    def delete
-      @redis.del(FEATURES_KEY)
+      @redis.srem(FEATURES_KEY, feature)
     end
 
     def clear!
-      redis_keys = [FEATURES_KEY] + all.flat_map do |feature|
-        SUBKEYS.map { |subkey| key(feature, subkey) }
-      end
-      @redis.del(redis_keys)
+      @redis.del(FEATURES_KEY)
     end
 
     def key(name, type)

@@ -675,42 +675,16 @@ RSpec.describe "Rollout" do
 end
 
 describe "Rollout::Feature" do
+  let(:redis) { Redis.new }
+
   describe "#initialize" do
     describe "when string does not exist" do
-      it 'clears feature attributes when string is not given' do
-        feature = Rollout::Feature.new(:chat)
+      it 'has cleared feature attributes by default' do
+        feature = ::Feature.new(:chat, redis)
         expect(feature.groups).to be_empty
         expect(feature.users).to be_empty
         expect(feature.percentage).to eq 0
         expect(feature.data).to eq({})
-      end
-
-      it 'clears feature attributes when string is nil' do
-        feature = Rollout::Feature.new(:chat, nil)
-        expect(feature.groups).to be_empty
-        expect(feature.users).to be_empty
-        expect(feature.percentage).to eq 0
-        expect(feature.data).to eq({})
-      end
-
-      it 'clears feature attributes when string is empty string' do
-        feature = Rollout::Feature.new(:chat, "")
-        expect(feature.groups).to be_empty
-        expect(feature.users).to be_empty
-        expect(feature.percentage).to eq 0
-        expect(feature.data).to eq({})
-      end
-
-      describe "when there is no data" do
-        it 'sets @data to empty hash' do
-          feature = Rollout::Feature.new(:chat, "0||")
-          expect(feature.data).to eq({})
-        end
-
-        it 'sets @data to empty hash' do
-          feature = Rollout::Feature.new(:chat, "|||   ")
-          expect(feature.data).to eq({})
-        end
       end
     end
   end

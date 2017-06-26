@@ -1,52 +1,110 @@
 class Feature
   RAND_BASE = (2**32 - 1) / 100.0
 
-  # @DEPRECATED: Will become readers only in the future
-  attr_reader :groups, :users, :percentage, :data
+  KEY_PERCENTAGE = "percentage".freeze
+  KEY_USERS      = "users".freeze
+  KEY_GROUPS     = "groups".freeze
+  KEY_DATA       = "data".freeze
+  SUBKEYS        = [KEY_PERCENTAGE, KEY_USERS, KEY_GROUPS, KEY_DATA].freeze
+
   attr_reader :name, :options
 
-  def initialize(name, string = nil, opts = {})
+  def initialize(name, redis, opts = {})
     @options = opts
     @name    = name
+    @redis = redis
+  end
 
-    if string
-      raw_percentage,raw_users,raw_groups,raw_data = string.split('|', 4)
-      @percentage = raw_percentage.to_f
-      @users = users_from_string(raw_users)
-      @groups = groups_from_string(raw_groups)
-      @data = raw_data.nil? || raw_data.strip.empty? ? {} : JSON.parse(raw_data)
+  def percentage
+    (@redis.get(key(KEY_PERCENTAGE)) || 0).to_f
+  end
+
+  def percentage=(new_percentage)
+    @redis.set(key(KEY_PERCENTAGE), new_percentage)
+  end
+
+  def users
+    users = @redis.smembers(key(KEY_USERS))
+    if @options[:use_sets]
+      users.to_set
     else
-      clear
+      users.sort
     end
   end
 
-  def clear
-    @groups = groups_from_string("")
-    @users = users_from_string("")
-    @percentage = 0
-    @data = {}
+  def add_users(users)
+    @redis.sadd(key(KEY_USERS), users.map { |u| user_id(u) })
+  end
+
+  def remove_users(users)
+    @redis.srem(key(KEY_USERS), users.map { |u| user_id(u) })
+  end
+
+  def groups
+    groups = @redis.smembers(key(KEY_GROUPS)).map(&:to_sym)
+    if @options[:use_sets]
+      groups.to_set
+    else
+      groups.sort
+    end
+  end
+
+  def add_group(group)
+    @redis.sadd(key(KEY_GROUPS), group)
+  end
+
+  def remove_group(group)
+    @redis.srem(key(KEY_GROUPS), group)
+  end
+
+  def data
+    raw_data = @redis.get(key(KEY_DATA))
+    raw_data.nil? || raw_data.strip.empty? ? {} : JSON.parse(raw_data)
+  end
+
+  def data=(new_data)
+    if new_data.is_a? Hash
+      old_data = data
+      @redis.set(key(KEY_DATA), old_data.merge!(new_data).to_json)
+    end
+  end
+
+  def clear_data!
+    @redis.set(key(KEY_DATA), "{}")
   end
 
   def active?(rollout, user)
-    if user
+    if percentage == 100 # Short circuit this case so we don't start looking up users
+      true
+    elsif user
       id = user_id(user)
-      user_in_percentage?(id) ||
-        rollout.user_in_active_users?(name, id) ||
-          user_in_active_group?(user, rollout)
+      user_in_percentage?(id) || user_in_active_users?(id) || user_in_active_group?(user, rollout)
     else
-      @percentage == 100
+      false
     end
+  end
+
+  def user_in_active_users?(user)
+    @redis.sismember(key(KEY_USERS), user)
   end
 
   def to_hash
     {
-      percentage: @percentage,
-      groups: @groups,
-      users: @users
+      percentage: percentage,
+      groups: groups,
+      users: users
     }
   end
 
+  def clear!
+    @redis.del(SUBKEYS.map { |subkey| key(subkey) })
+  end
+
   private
+    def key(type)
+      "feature:#{name}:#{type}"
+    end
+
     def user_id(user)
       if user.is_a?(Integer) || user.is_a?(String)
         user.to_s
@@ -60,7 +118,7 @@ class Feature
     end
 
     def user_in_percentage?(user)
-      Zlib.crc32(user_id_for_percentage(user)) < RAND_BASE * @percentage
+      Zlib.crc32(user_id_for_percentage(user)) < RAND_BASE * percentage
     end
 
     def user_id_for_percentage(user)
@@ -72,32 +130,8 @@ class Feature
     end
 
     def user_in_active_group?(user, rollout)
-      @groups.any? do |g|
+      groups.any? do |g|
         rollout.active_in_group?(g, user)
-      end
-    end
-
-    def serialize_data
-      return "" unless @data.is_a? Hash
-
-      @data.to_json
-    end
-
-    def users_from_string(raw_users)
-      users = (raw_users || "").split(",").map(&:to_s)
-      if @options[:use_sets]
-        users.to_set
-      else
-        users.sort
-      end
-    end
-
-    def groups_from_string(raw_groups)
-      groups = (raw_groups || "").split(",").map(&:to_sym)
-      if @options[:use_sets]
-        groups.to_set
-      else
-        groups.sort
       end
     end
 end
