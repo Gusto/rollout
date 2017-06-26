@@ -21,7 +21,7 @@ class Rollout
 
   def delete(feature)
     get(feature).clear!
-    feature_storage.delete_feature(feature)
+    feature_list.delete_feature(feature)
   end
 
   def set(feature, desired_state)
@@ -87,7 +87,7 @@ class Rollout
   end
 
   def get_uncached(feature)
-    feature_storage.add_feature(feature)
+    feature_list.add_feature(feature)
     Feature.new(feature, @redis, @options)
   end
 
@@ -115,7 +115,7 @@ class Rollout
   end
 
   def features
-    feature_storage.all
+    feature_list.all
   end
 
   def feature_states(user = nil)
@@ -134,16 +134,16 @@ class Rollout
     features.each do |feature|
       get(feature).clear!
     end
-    feature_storage.clear!
+    feature_list.clear!
   end
 
   private
 
-  def feature_storage
-    @feature_storage ||= FeatureStorage.new(@redis)
+  def feature_list
+    @feature_list ||= FeatureList.new(@redis)
   end
 
-  class FeatureStorage
+  class FeatureList
     FEATURES_KEY   = "feature:__features__".freeze
 
     def initialize(redis)
@@ -164,10 +164,6 @@ class Rollout
 
     def clear!
       @redis.del(FEATURES_KEY)
-    end
-
-    def key(name, type)
-      "feature:#{name}:#{type}"
     end
   end
 end
