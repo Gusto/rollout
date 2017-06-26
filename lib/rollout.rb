@@ -177,39 +177,39 @@ class Rollout
   end
 
   def feature_list
-    FeatureList.new(@storage)
+    FeatureStorage.new(@storage)
   end
 
-  class FeatureList
+  class FeatureStorage
     FEATURES_KEY = "feature:__features__".freeze
 
-    def initialize(storage)
-      @storage = storage
+    def initialize(redis)
+      @redis = redis
     end
 
     def all
-      @storage.smembers(FEATURES_KEY).map(&:to_sym)
+      @redis.smembers(FEATURES_KEY).map(&:to_sym)
     end
 
     def fetch_feature(feature)
-      @storage.get(legacy_key(feature))
+      @redis.get(legacy_key(feature))
     end
 
     def fetch_multi_features(features)
       feature_keys = features.map{ |feature| legacy_key(feature) }
-      @storage.mget(*feature_keys).map.with_index { |string, index| [features[index], string] }
+      @redis.mget(*feature_keys).map.with_index { |string, index| [features[index], string] }
     end
 
     def add_feature(feature)
-      @storage.sadd(FEATURES_KEY, feature)
+      @redis.sadd(FEATURES_KEY, feature)
     end
 
     def delete_feature(feature)
-      @storage.srem(FEATURES_KEY, feature)
+      @redis.srem(FEATURES_KEY, feature)
     end
 
     def delete
-      @storage.del(FEATURES_KEY)
+      @redis.del(FEATURES_KEY)
     end
 
     def legacy_key(name)
