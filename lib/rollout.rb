@@ -68,12 +68,7 @@ class Rollout
   end
 
   def user_in_active_users?(feature, user = nil)
-    feature = get(feature)
-    feature.user_in_active_users?(user)
-  end
-
-  def user_in_user_list?(feature, user)
-    feature_storage.user_in_user_list?(feature, user)
+    feature_storage.user_in_user_list?(feature, user_id_for_user(user))
   end
 
   def inactive?(feature, user = nil)
