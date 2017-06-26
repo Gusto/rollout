@@ -154,8 +154,7 @@ class Rollout
 
   def clear!
     features.each do |feature|
-      with_feature(feature) { |f| f.clear }
-      @storage.del(key(feature))
+      delete(feature)
     end
 
     @storage.del(features_key)
