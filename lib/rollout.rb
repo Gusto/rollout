@@ -37,15 +37,11 @@ class Rollout
   end
 
   def activate_group(feature, group)
-    with_feature(feature) do |f|
-      f.add_group(group)
-    end
+    feature_storage.activate_group(feature, group)
   end
 
   def deactivate_group(feature, group)
-    with_feature(feature) do |f|
-      f.remove_group(group)
-    end
+    feature_storage.deactivate_group(feature, group)
   end
 
   def activate_user(feature, user)
@@ -211,6 +207,14 @@ class Rollout
         @redis.set(key(feature.name, KEY_DATA), serialized[3])
         @redis.sadd(FEATURES_KEY, feature.name)
       end
+    end
+
+    def activate_group(feature, group)
+      @redis.sadd(key(feature, KEY_GROUPS), group)
+    end
+
+    def deactivate_group(feature, group)
+      @redis.srem(key(feature, KEY_GROUPS), group)
     end
 
     def delete_feature(feature)
