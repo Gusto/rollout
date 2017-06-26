@@ -163,10 +163,6 @@ class Rollout
   def with_feature(feature)
     f = get(feature)
     yield(f)
-    save(f)
-  end
-
-  def save(feature)
     feature_storage.save_feature(feature.name, feature.serialize)
   end
 
