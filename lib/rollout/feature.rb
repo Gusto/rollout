@@ -1,11 +1,14 @@
 class Feature
   RAND_BASE = (2**32 - 1) / 100.0
 
-  KEY_PERCENTAGE = "percentage".freeze
-  KEY_USERS      = "users".freeze
-  KEY_GROUPS     = "groups".freeze
-  KEY_DATA       = "data".freeze
-  SUBKEYS        = [KEY_PERCENTAGE, KEY_USERS, KEY_GROUPS, KEY_DATA].freeze
+  ATTR_KEY_PERCENTAGE = "percentage".freeze
+  ATTR_KEY_USERS      = "users".freeze
+  ATTR_KEY_GROUPS     = "groups".freeze
+  ATTR_KEY_DATA       = "data".freeze
+  SUBKEYS             = [ ATTR_KEY_PERCENTAGE,
+                          ATTR_KEY_USERS,
+                          ATTR_KEY_GROUPS,
+                          ATTR_KEY_DATA ].freeze
 
   attr_reader :name, :options
 
@@ -16,15 +19,15 @@ class Feature
   end
 
   def percentage
-    (@redis.get(key(KEY_PERCENTAGE)) || 0).to_f
+    (@redis.get(key(ATTR_KEY_PERCENTAGE)) || 0).to_f
   end
 
   def percentage=(new_percentage)
-    @redis.set(key(KEY_PERCENTAGE), new_percentage)
+    @redis.set(key(ATTR_KEY_PERCENTAGE), new_percentage)
   end
 
   def users
-    users = @redis.smembers(key(KEY_USERS))
+    users = @redis.smembers(key(ATTR_KEY_USERS))
     if @options[:use_sets]
       users.to_set
     else
@@ -33,15 +36,15 @@ class Feature
   end
 
   def add_users(users)
-    @redis.sadd(key(KEY_USERS), users.map { |u| user_id(u) })
+    @redis.sadd(key(ATTR_KEY_USERS), users.map { |u| user_id(u) })
   end
 
   def remove_users(users)
-    @redis.srem(key(KEY_USERS), users.map { |u| user_id(u) })
+    @redis.srem(key(ATTR_KEY_USERS), users.map { |u| user_id(u) })
   end
 
   def groups
-    groups = @redis.smembers(key(KEY_GROUPS)).map(&:to_sym)
+    groups = @redis.smembers(key(ATTR_KEY_GROUPS)).map(&:to_sym)
     if @options[:use_sets]
       groups.to_set
     else
@@ -50,27 +53,27 @@ class Feature
   end
 
   def add_group(group)
-    @redis.sadd(key(KEY_GROUPS), group)
+    @redis.sadd(key(ATTR_KEY_GROUPS), group)
   end
 
   def remove_group(group)
-    @redis.srem(key(KEY_GROUPS), group)
+    @redis.srem(key(ATTR_KEY_GROUPS), group)
   end
 
   def data
-    raw_data = @redis.get(key(KEY_DATA))
+    raw_data = @redis.get(key(ATTR_KEY_DATA))
     raw_data.nil? || raw_data.strip.empty? ? {} : JSON.parse(raw_data)
   end
 
   def data=(new_data)
     if new_data.is_a? Hash
       old_data = data
-      @redis.set(key(KEY_DATA), old_data.merge!(new_data).to_json)
+      @redis.set(key(ATTR_KEY_DATA), old_data.merge!(new_data).to_json)
     end
   end
 
   def clear_data!
-    @redis.set(key(KEY_DATA), "{}")
+    @redis.set(key(ATTR_KEY_DATA), "{}")
   end
 
   def active?(rollout, user)
@@ -85,7 +88,7 @@ class Feature
   end
 
   def user_in_active_users?(user)
-    @redis.sismember(key(KEY_USERS), user)
+    @redis.sismember(key(ATTR_KEY_USERS), user)
   end
 
   def to_hash
