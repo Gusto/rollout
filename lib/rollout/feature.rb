@@ -1,6 +1,7 @@
 class Feature
   RAND_BASE = (2**32 - 1) / 100.0
 
+  # @DEPRECATED: Will become readers only in the future
   attr_accessor :groups, :users, :percentage, :data
   attr_reader :name, :options
 
@@ -19,23 +20,28 @@ class Feature
     end
   end
 
+  # @DEPRECATED
   def serialize
     "#{@percentage}|#{@users.to_a.join(",")}|#{@groups.to_a.join(",")}|#{serialize_data}"
   end
 
+  # @DEPRECATED
   def add_user(user)
     id = user_id(user)
     @users << id unless @users.include?(id)
   end
 
+  # @DEPRECATED
   def remove_user(user)
     @users.delete(user_id(user))
   end
 
+  # @DEPRECATED
   def add_group(group)
     @groups << group.to_sym unless @groups.include?(group.to_sym)
   end
 
+  # @DEPRECATED
   def remove_group(group)
     @groups.delete(group.to_sym)
   end
@@ -58,7 +64,7 @@ class Feature
     end
   end
 
-  # DEPRECATED: This is a slow method of looking up user membership
+  # @DEPRECATED
   def user_in_active_users?(user)
     @users.include?(user_id(user))
   end
