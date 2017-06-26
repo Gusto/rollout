@@ -27,9 +27,7 @@ class Rollout
   end
 
   def delete(feature)
-    features = (@storage.get(features_key) || "").split(",")
-    features.delete(feature.to_s)
-    @storage.set(features_key, features.join(","))
+    feature_list.remove_feature(feature)
     @storage.del(key(feature))
   end
 
@@ -137,7 +135,7 @@ class Rollout
   end
 
   def features
-    (@storage.get(features_key) || "").split(",").map(&:to_sym)
+    feature_list.all
   end
 
   def feature_states(user = nil)
@@ -157,17 +155,13 @@ class Rollout
       delete(feature)
     end
 
-    @storage.del(features_key)
+    feature_list.delete
   end
 
   private
 
   def key(name)
     "feature:#{name}"
-  end
-
-  def features_key
-    "feature:__features__"
   end
 
   def with_feature(feature)
@@ -178,6 +172,34 @@ class Rollout
 
   def save(feature)
     @storage.set(key(feature.name), feature.serialize)
-    @storage.set(features_key, (features | [feature.name.to_sym]).join(","))
+    feature_list.add_feature(feature.name)
+  end
+
+  def feature_list
+    FeatureList.new(@storage)
+  end
+
+  class FeatureList
+    FEATURES_KEY = "feature:__features__".freeze
+
+    def initialize(storage)
+      @storage = storage
+    end
+
+    def all
+      @storage.smembers(FEATURES_KEY).map(&:to_sym)
+    end
+
+    def add_feature(feature)
+      @storage.sadd(FEATURES_KEY, feature)
+    end
+
+    def remove_feature(feature)
+      @storage.srem(FEATURES_KEY, feature)
+    end
+
+    def delete
+      @storage.del(FEATURES_KEY)
+    end
   end
 end
