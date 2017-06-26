@@ -45,27 +45,19 @@ class Rollout
   end
 
   def activate_user(feature, user)
-    with_feature(feature) do |f|
-      f.add_user(user)
-    end
+    activate_users(feature, [user])
   end
 
   def deactivate_user(feature, user)
-    with_feature(feature) do |f|
-      f.remove_user(user)
-    end
+    deactivate_users(feature, [user])
   end
 
   def activate_users(feature, users)
-    with_feature(feature) do |f|
-      users.each{|user| f.add_user(user)}
-    end
+    feature_storage.activate_users(feature, users.map { |u| user_id_for_user(u) })
   end
 
   def deactivate_users(feature, users)
-    with_feature(feature) do |f|
-      users.each{|user| f.remove_user(user)}
-    end
+    feature_storage.deactivate_users(feature, users.map { |u| user_id_for_user(u) })
   end
 
   def define_group(group, &block)
@@ -158,6 +150,18 @@ class Rollout
     @feature_storage ||= FeatureStorage.new(@storage)
   end
 
+  def user_id_for_user(user)
+    if user.is_a?(Integer) || user.is_a?(String)
+      user.to_s
+    else
+      user.send(id_user_by).to_s
+    end
+  end
+
+  def id_user_by
+    @options[:id_user_by] || :id
+  end
+
   class FeatureStorage
     FEATURES_KEY   = "feature:__features__".freeze
     KEY_PERCENTAGE = "percentage".freeze
@@ -211,10 +215,22 @@ class Rollout
 
     def activate_group(feature, group)
       @redis.sadd(key(feature, KEY_GROUPS), group)
+      @redis.sadd(FEATURES_KEY, feature)
     end
 
     def deactivate_group(feature, group)
       @redis.srem(key(feature, KEY_GROUPS), group)
+      @redis.sadd(FEATURES_KEY, feature)
+    end
+
+    def activate_users(feature, users)
+      @redis.sadd(key(feature, KEY_USERS), users)
+      @redis.sadd(FEATURES_KEY, feature)
+    end
+
+    def deactivate_users(feature, users)
+      @redis.srem(key(feature, KEY_USERS), users)
+      @redis.sadd(FEATURES_KEY, feature)
     end
 
     def delete_feature(feature)
