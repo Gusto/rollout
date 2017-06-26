@@ -15,7 +15,7 @@ class Rollout
   end
 
   def activate(feature)
-    feature_storage.set_percentage(feature, 100)
+    activate_percentage(feature, 100)
   end
 
   def deactivate(feature)
@@ -28,7 +28,7 @@ class Rollout
 
   def set(feature, desired_state)
     if desired_state
-      feature_storage.set_percentage(feature, 100)
+      activate_percentage(feature, 100)
     else
       deactivate(feature)
     end
@@ -81,7 +81,7 @@ class Rollout
   end
 
   def deactivate_percentage(feature)
-    feature_storage.set_percentage(feature, 0)
+    activate_percentage(feature, 0)
   end
 
   def active_in_group?(group, user)
