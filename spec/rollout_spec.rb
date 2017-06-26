@@ -160,6 +160,27 @@ RSpec.describe "Rollout" do
         expect(rollout).not_to be_active(:chat, 4)
       end
     end
+
+    context "specified by user objects with special :id_user_by set" do
+      let(:users) {
+        [
+          double(email: '1@example.com'),
+          double(email: '2@example.com'),
+          double(email: '3@example.com')
+        ]
+      }
+      let(:rollout_options) { {id_user_by: :email} }
+
+      before { rollout.activate_users(:chat, users) }
+
+      it "is active for the given users" do
+        users.each { |user| expect(rollout).to be_active(:chat, user) }
+      end
+
+      it "remains inactive for other users" do
+        expect(rollout).not_to be_active(:chat, double(email: '4@example.com'))
+      end
+    end
   end
 
   describe "deactivating a specific user" do
@@ -654,15 +675,6 @@ RSpec.describe "Rollout" do
 end
 
 describe "Rollout::Feature" do
-  describe "#add_user" do
-    it "ids a user using id_user_by" do
-      user    = double("User", email: "test@test.com")
-      feature = Rollout::Feature.new(:chat, nil, id_user_by: :email)
-      feature.add_user(user)
-      expect(user).to have_received :email
-    end
-  end
-
   describe "#initialize" do
     describe "when string does not exist" do
       it 'clears feature attributes when string is not given' do
