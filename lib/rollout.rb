@@ -151,11 +151,7 @@ class Rollout
   end
 
   def clear!
-    features.each do |feature|
-      delete(feature)
-    end
-
-    feature_storage.delete
+    feature_storage.clear!
   end
 
   private
@@ -202,6 +198,13 @@ class Rollout
 
     def delete
       @redis.del(FEATURES_KEY)
+    end
+
+    def clear!
+      all.each do |feature|
+        delete_feature(feature)
+      end
+      delete
     end
 
     def legacy_key(name)
