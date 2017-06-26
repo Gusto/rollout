@@ -105,6 +105,11 @@ class Rollout
     end
   end
 
+  def multi_get(*features)
+    feature_keys = features.map{ |feature| key(feature) }
+    @storage.mget(*feature_keys).map.with_index { |string, index| Feature.new(features[index], string, @options) }
+  end
+
   def features
     @redis.smembers(FEATURES_KEY).map(&:to_sym)
   end
