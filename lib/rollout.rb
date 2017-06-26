@@ -28,7 +28,6 @@ class Rollout
 
   def delete(feature)
     feature_list.delete_feature(feature)
-    @storage.del(key(feature))
   end
 
   def set(feature, desired_state)
@@ -206,6 +205,7 @@ class Rollout
 
     def delete_feature(feature)
       @redis.srem(FEATURES_KEY, feature)
+      @redis.del(legacy_key(feature))
     end
 
     def delete
