@@ -182,8 +182,7 @@ class Rollout
     end
 
     def fetch_multi_features(features)
-      feature_keys = features.map{ |feature| legacy_key(feature) }
-      @redis.mget(*feature_keys).map.with_index { |string, index| [features[index], string] }
+      features.map { |feature| [feature, fetch_feature(feature)] }
     end
 
     def save_feature(feature)
