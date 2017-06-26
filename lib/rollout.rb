@@ -79,15 +79,11 @@ class Rollout
   end
 
   def activate_percentage(feature, percentage)
-    with_feature(feature) do |f|
-      f.percentage = percentage
-    end
+    feature_storage.set_percentage(feature, percentage)
   end
 
   def deactivate_percentage(feature)
-    with_feature(feature) do |f|
-      f.percentage = 0
-    end
+    feature_storage.set_percentage(feature, 0)
   end
 
   def active_in_group?(group, user)
