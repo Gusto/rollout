@@ -15,9 +15,7 @@ class Rollout
   end
 
   def activate(feature)
-    with_feature(feature) do |f|
-      f.percentage = 100
-    end
+    feature_storage.set_percentage(feature, 100)
   end
 
   def deactivate(feature)
@@ -31,12 +29,10 @@ class Rollout
   end
 
   def set(feature, desired_state)
-    with_feature(feature) do |f|
-      if desired_state
-        f.percentage = 100
-      else
-        f.clear
-      end
+    if desired_state
+      feature_storage.set_percentage(feature, 100)
+    else
+      deactivate(feature)
     end
   end
 
@@ -180,6 +176,11 @@ class Rollout
 
     def all
       @redis.smembers(FEATURES_KEY).map(&:to_sym)
+    end
+
+    def set_percentage(feature, percentage)
+      @redis.set(key(feature, KEY_PERCENTAGE), percentage)
+      @redis.sadd(FEATURES_KEY, feature)
     end
 
     def fetch_feature(feature)
