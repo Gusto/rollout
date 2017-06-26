@@ -210,32 +210,42 @@ class Rollout
     end
 
     def activate_group(feature, group)
-      @redis.sadd(key(feature, KEY_GROUPS), group)
-      @redis.sadd(FEATURES_KEY, feature)
+      @redis.multi do
+        @redis.sadd(key(feature, KEY_GROUPS), group)
+        @redis.sadd(FEATURES_KEY, feature)
+      end
     end
 
     def deactivate_group(feature, group)
-      @redis.srem(key(feature, KEY_GROUPS), group)
-      @redis.sadd(FEATURES_KEY, feature)
+      @redis.multi do
+        @redis.srem(key(feature, KEY_GROUPS), group)
+        @redis.sadd(FEATURES_KEY, feature)
+      end
     end
 
     def activate_users(feature, users)
-      @redis.sadd(key(feature, KEY_USERS), users)
-      @redis.sadd(FEATURES_KEY, feature)
+      @redis.multi do
+        @redis.sadd(key(feature, KEY_USERS), users)
+        @redis.sadd(FEATURES_KEY, feature)
+      end
     end
 
     def deactivate_users(feature, users)
-      @redis.srem(key(feature, KEY_USERS), users)
-      @redis.sadd(FEATURES_KEY, feature)
+      @redis.multi do
+        @redis.srem(key(feature, KEY_USERS), users)
+        @redis.sadd(FEATURES_KEY, feature)
+      end
     end
 
     def delete_feature(feature)
       @redis.multi do
         @redis.srem(FEATURES_KEY, feature)
-        SUBKEYS.each do |subkey|
-          @redis.del(key(feature, subkey))
-        end
+        clear_feature(feature)
       end
+    end
+
+    def clear_feature(feature)
+      @redis.del(SUBKEYS.map { |subkey| key(feature, subkey) })
     end
 
     def delete
