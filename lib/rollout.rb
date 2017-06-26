@@ -159,7 +159,7 @@ class Rollout
   def with_feature(feature)
     f = get(feature)
     yield(f)
-    feature_storage.save_feature(f.name, f.serialize)
+    feature_storage.save_feature(f)
   end
 
   def feature_storage
@@ -186,9 +186,9 @@ class Rollout
       @redis.mget(*feature_keys).map.with_index { |string, index| [features[index], string] }
     end
 
-    def save_feature(feature, data)
-      @redis.set(legacy_key(feature), data)
-      @redis.sadd(FEATURES_KEY, feature)
+    def save_feature(feature)
+      @redis.set(legacy_key(feature.name), feature.serialize)
+      @redis.sadd(FEATURES_KEY, feature.name)
     end
 
     def delete_feature(feature)
