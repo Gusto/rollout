@@ -72,6 +72,10 @@ class Rollout
     feature.user_in_active_users?(user)
   end
 
+  def user_in_user_list?(feature, user)
+    feature_storage.user_in_user_list?(feature, user)
+  end
+
   def inactive?(feature, user = nil)
     !active?(feature, user)
   end
@@ -200,6 +204,10 @@ class Rollout
         @redis.sadd(key(feature, KEY_USERS), users)
         @redis.sadd(FEATURES_KEY, feature)
       end
+    end
+
+    def user_in_user_list?(feature, user)
+      @redis.sismember(key(feature, KEY_USERS), user)
     end
 
     def deactivate_users(feature, users)

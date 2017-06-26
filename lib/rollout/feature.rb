@@ -51,13 +51,14 @@ class Feature
     if user
       id = user_id(user)
       user_in_percentage?(id) ||
-        user_in_active_users?(id) ||
+        rollout.user_in_user_list?(name, id) ||
           user_in_active_group?(user, rollout)
     else
       @percentage == 100
     end
   end
 
+  # DEPRECATED: This is a slow method of looking up user membership
   def user_in_active_users?(user)
     @users.include?(user_id(user))
   end
