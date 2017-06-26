@@ -160,10 +160,6 @@ class Rollout
 
   private
 
-  def key(name)
-    "feature:#{name}"
-  end
-
   def with_feature(feature)
     f = get(feature)
     yield(f)
