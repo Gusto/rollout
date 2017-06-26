@@ -112,7 +112,7 @@ class Feature
       if @options[:use_sets]
         users.to_set
       else
-        users
+        users.sort
       end
     end
 
@@ -121,7 +121,7 @@ class Feature
       if @options[:use_sets]
         groups.to_set
       else
-        groups
+        groups.sort
       end
     end
 end

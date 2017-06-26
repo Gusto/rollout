@@ -186,8 +186,8 @@ class Rollout
     def fetch_feature(feature)
       percentage, users, groups, data = @redis.multi do
         @redis.get(key(feature, KEY_PERCENTAGE))
-        @redis.lrange(key(feature, KEY_USERS), 0, -1)
-        @redis.lrange(key(feature, KEY_GROUPS), 0, -1)
+        @redis.smembers(key(feature, KEY_USERS))
+        @redis.smembers(key(feature, KEY_GROUPS))
         @redis.get(key(feature, KEY_DATA))
       end
       "#{percentage}|#{users.join(',')}|#{groups.join(',')}|#{data}"
@@ -204,9 +204,9 @@ class Rollout
 
         # TODO: we clear lists before we set new values, this should be refactored out later
         @redis.del(key(feature.name, KEY_USERS))
-        @redis.rpush(key(feature.name, KEY_USERS), feature.users.to_a) if feature.users.size > 0
+        @redis.sadd(key(feature.name, KEY_USERS), feature.users.to_a) if feature.users.size > 0
         @redis.del(key(feature.name, KEY_GROUPS))
-        @redis.rpush(key(feature.name, KEY_GROUPS), feature.groups.to_a) if feature.groups.size > 0
+        @redis.sadd(key(feature.name, KEY_GROUPS), feature.groups.to_a) if feature.groups.size > 0
 
         @redis.set(key(feature.name, KEY_DATA), serialized[3])
         @redis.sadd(FEATURES_KEY, feature.name)
