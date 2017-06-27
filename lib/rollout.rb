@@ -88,7 +88,8 @@ class Rollout
   end
 
   def get(feature)
-    feature_cache[feature]
+    add_to_feature_list(feature)
+    Feature.new(feature, @redis, @options)
   end
 
   def set_feature_data(feature, data)
@@ -130,15 +131,7 @@ class Rollout
 
   private
 
-  def get_uncached(feature)
-    # Right now we add the feature to the feature list if anything tries to
-    # fetch it, this is due to rollout working a bit funky in that case.
+  def add_to_feature_list(feature)
     @redis.sadd(FEATURES_KEY, feature)
-    Feature.new(feature, @redis, @options)
-  end
-
-  # We can cache aggresively because the feature class re-fetches things correctly
-  def feature_cache
-    @feature_cache ||= Hash.new {|h, key| h[key] = get_uncached(key) }
   end
 end

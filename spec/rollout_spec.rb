@@ -510,6 +510,16 @@ RSpec.describe "Rollout" do
     it "removes all features" do
       expect(rollout.features).to be_empty
     end
+
+    context 'when a feature is re-added after being cleared' do
+      before do
+        rollout.activate(features.first)
+      end
+
+      it 'is added to the features list' do
+        expect(rollout.features).to eq [features.first.to_sym]
+      end
+    end
   end
 
   describe "#feature_states" do
