@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    rollout (3.0.0.zp)
+    rollout (3.0.1.zp)
 
 GEM
   remote: https://rubygems.org/

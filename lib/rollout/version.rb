@@ -1,3 +1,3 @@
 class Rollout
-  VERSION = "3.0.0.zp"
+  VERSION = "3.0.1.zp"
 end
